@@ -149,4 +149,3 @@ class Kernel::Quota_scheduler
 };
 
 #endif /* _CORE__INCLUDE__KERNEL__CPU_SCHEDULER_H_ */
-

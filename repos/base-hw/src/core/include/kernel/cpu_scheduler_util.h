@@ -1,6 +1,6 @@
 /*
  * \brief  Utility used by the scheduler
- * \author IDA Tu Braunschweig
+ * \author Dusting Frey
  * \date   2017-04-14
  */
 
@@ -68,10 +68,9 @@ class Kernel::Cpu_priority
 
 class Kernel::Cpu_share : public Cpu_claim, public Cpu_fill
 {
-	friend class Cpu_scheduler;
-	friend class Quota_scheduler;
+	friend class Scheduler_policy;
 
-public:
+    public:
 
 	signed const _prio;
 	unsigned     _quota;

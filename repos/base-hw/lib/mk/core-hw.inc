@@ -59,6 +59,13 @@ SRC_CC += kernel/object.cc
 SRC_CC += init_main_thread.cc
 SRC_CC += capability.cc
 
+
+ifneq ($(filter $(SPECS), quota_priority_scheduler), )
+	include $(BASE_DIR)/../base-hw/lib/mk/spec/quota_priority_scheduler/core-hw.inc
+else
+	include $(BASE_DIR)/../base-hw/lib/mk/spec/quota_scheduler/core-hw.inc
+endif
+
 # provide Genode version information
 include $(BASE_DIR)/src/core/version.inc
 

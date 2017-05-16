@@ -1,3 +1,4 @@
+
 /*
  * \brief  Schedules CPU shares for the execution time of a CPU
  * \author Martin Stein
@@ -11,33 +12,28 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
-#ifndef _CORE__INCLUDE__KERNEL__CPU_SCHEDULER_H_
-#define _CORE__INCLUDE__KERNEL__CPU_SCHEDULER_H_
+#ifndef _CORE__INCLUDE__KERNEL__QUOTA_PRIORITY_SCHEDULER_H
+#define _CORE__INCLUDE__KERNEL__QUOTA_PRIORITY_SCHEDULER_H
 
 /* core includes */
 #include <util.h>
 #include <kernel/configuration.h>
-#include <kernel/scheduler_policy.h>
-#include <kernel/cpu_scheduler_util.h>
-#include <kernel/double_list.h>
 #include <kernel/cpu_scheduler_util.h>
 #include <kernel/quota_scheduler.h>
+#include <kernel/double_list.h>
 
-namespace Kernel
-{
-	class Cpu_scheduler;
-}
+#include <base/log.h>
 
 namespace Kernel {
 
 	/**
 	 * Schedules CPU shares for the execution time of a CPU
 	 */
-	class Cpu_scheduler;
+	class Quota_priority_scheduler;
 }
 
 
-class Kernel::Cpu_scheduler : public Scheduler_policy
+class Kernel::Quota_priority_scheduler : public Quota_scheduler
 {
 	private:
 		typedef Cpu_share                Share;
@@ -47,9 +43,12 @@ class Kernel::Cpu_scheduler : public Scheduler_policy
 		typedef Double_list_typed<Fill>  Fill_list;
 		typedef Cpu_priority             Prio;
 
-
 	public:
-		Cpu_scheduler(Share * const i, unsigned const q, unsigned const f) : Scheduler_policy(i, q, f) { }
+		Quota_priority_scheduler(Share * const i, unsigned const q, 
+                unsigned const f) : Quota_scheduler(i, q, f) { }
+
+    protected:
+        bool _fill_for_head() override;
 };
 
-#endif /* _CORE__INCLUDE__KERNEL__CPU_SCHEDULER_H_ */
+#endif

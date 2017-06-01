@@ -45,6 +45,12 @@ namespace Kernel
 	 * Schedules CPU shares for the execution time of a CPU
 	 */
 	class Cpu_scheduler;
+
+	/**
+	 * Scheduling context that saves start-execution time and quota consumend
+	 */
+    class Cpu_replenishment;
+
 }
 
 class Kernel::Cpu_priority
@@ -109,6 +115,13 @@ class Kernel::Cpu_share : public Cpu_claim, public Cpu_fill
 		void quota(unsigned const q) { _quota = q; }
 };
 
+class Kernel::Cpu_replenishment : public Double_list_item {
+    public:
+        unsigned _consumed_quota;
+        unsigned long _replenish_time;
+        Cpu_share *_share;
+};
+
 class Kernel::Cpu_scheduler
 {
 	private:
@@ -119,10 +132,13 @@ class Kernel::Cpu_scheduler
 		typedef Double_list_typed<Claim> Claim_list;
 		typedef Double_list_typed<Fill>  Fill_list;
 		typedef Cpu_priority             Prio;
+        typedef Cpu_replenishment        Replenishment;
+        typedef Double_list_typed<Replenishment> Replenishment_list;
 
 		Claim_list     _rcl[Prio::MAX + 1]; /* ready claims */
 		Claim_list     _ucl[Prio::MAX + 1]; /* unready claims */
 		Fill_list      _fills;              /* ready fills */
+        Replenishment_list _rts;            /* replenishment timings */
 		Share * const  _idle;
 		Share *        _head;
 		unsigned       _head_quota;
@@ -131,6 +147,9 @@ class Kernel::Cpu_scheduler
 		unsigned const _quota;
 		unsigned       _residual;
 		unsigned const _fill;
+
+        unsigned _total_replenish;
+        unsigned _current_consumption;
 
 		template <typename F> void _for_each_prio(F f) {
 			for (signed p = Prio::MAX; p > Prio::MIN - 1; p--) { f(p); } }
@@ -147,7 +166,7 @@ class Kernel::Cpu_scheduler
 		void     _next_fill();
 		void     _head_claimed(unsigned const r);
 		void     _head_filled(unsigned const r);
-		bool     _claim_for_head();
+		bool     _claim_for_head(unsigned q);
 		bool     _fill_for_head();
 		unsigned _trim_consumption(unsigned & q);
 

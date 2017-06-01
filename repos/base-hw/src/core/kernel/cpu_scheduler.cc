@@ -41,16 +41,28 @@ void Cpu_scheduler::_next_round()
 
 void Cpu_scheduler::_consumed(unsigned const q)
 {
-	if (_residual > q) { _residual -= q; }
-	else { _next_round(); }
+    Replenishment *rep = _rts.head();
+    if (!rep) {return;} /* No replenish timings, no updating  needed */
+
+    if (rep->_replenish_time <= q) {
+        rep->_share->_claim += rep->_consumed_quota;
+        _rts.remove(rep);
+        delete rep;
+
+        if (_total_replenish >= q) {
+            _total_replenish -= q;
+        }
+        return;
+    }
+    rep->_replenish_time =- q;
 }
 
 
 void Cpu_scheduler::_set_head(Share * const s, unsigned const q, bool const c)
 {
-	_head_quota = q;
+	_head_quota  = q;
 	_head_claims = c;
-	_head = s;
+	_head        = s;
 }
 
 
@@ -78,12 +90,35 @@ void Cpu_scheduler::_head_filled(unsigned const r)
 }
 
 
-bool Cpu_scheduler::_claim_for_head()
+bool Cpu_scheduler::_claim_for_head(unsigned r)
 {
 	for (signed p = Prio::MAX; p > Prio::MIN - 1; p--) {
 		Share * const s = _share(_rcl[p].head());
 		if (!s) { continue; }
 		if (!s->_claim) { continue; }
+
+        _current_consumption += r;
+        if (_head != s && _head_claims) { // neuer job, claim -> claim
+            Replenishment *rep   = new (Replenishment);
+            rep->_consumed_quota = _current_consumption;
+            rep->_share          = s;
+
+            Replenishment *rhead = _rts.head();
+            if (!rhead) {
+                _total_replenish     = _quota;
+                rep->_replenish_time = _quota;
+            } else {
+                rep->_replenish_time  = _quota - _total_replenish;
+                _total_replenish     += rep->_replenish_time;
+            }
+            _rts.insert_tail(rep);
+
+            _current_consumption = 0;
+        }
+        else { // idle/fill -> claim
+            _current_consumption = 0;
+        }
+
 		_set_head(s, s->_claim, 1);
 		return 1;
 	}
@@ -102,7 +137,7 @@ bool Cpu_scheduler::_fill_for_head()
 
 unsigned Cpu_scheduler::_trim_consumption(unsigned & q)
 {
-	q = Genode::min(Genode::min(q, _head_quota), _residual);
+	q = Genode::min(q, _head_quota);
 	if (!_head_yields) { return _head_quota - q; }
 	_head_yields = 0;
 	return 0;
@@ -133,14 +168,14 @@ void Cpu_scheduler::_quota_adaption(Share * const s, unsigned const q)
 void Cpu_scheduler::update(unsigned q)
 {
 	/* do not detract the quota if the head context was removed even now */
+    unsigned const r = _trim_consumption(q);
 	if (_head) {
-		unsigned const r = _trim_consumption(q);
 		if (_head_claims) { _head_claimed(r); }
 		else              { _head_filled(r);  }
 		_consumed(q);
 	}
 
-	if (_claim_for_head()) { return; }
+	if (_claim_for_head(r)) { return; }
 	if (_fill_for_head()) { return; }
 	_set_head(_idle, _fill, 0);
 }
@@ -196,6 +231,23 @@ void Cpu_scheduler::remove(Share * const s)
 	if (!s->_quota) { return; }
 	if (s->_ready) { _rcl[s->_prio].remove(s); }
 	else { _ucl[s->_prio].remove(s); }
+    // TODO: remove replenishtments
+    Replenishment *rep = _rts.head();
+    if (!rep) { return; }
+    while (rep) {
+        if (rep->_share == s) {
+            Replenishment *tmp = Replenishment_list::next(rep);
+            if (!tmp) {
+                _rts.remove(rep);
+                delete rep;
+                return;
+            }
+            tmp->_replenish_time += rep->_replenish_time;
+            _rts.remove(rep);
+            delete rep;
+            rep = tmp;
+        }
+    }
 }
 
 
@@ -219,5 +271,5 @@ void Cpu_scheduler::quota(Share * const s, unsigned const q)
 
 Cpu_scheduler::Cpu_scheduler(Share * const i, unsigned const q,
                              unsigned const f)
-: _idle(i), _head_yields(0), _quota(q), _residual(q), _fill(f)
+: _idle(i), _head_yields(0), _quota(q), _residual(q), _fill(f), _total_replenish(0), _current_consumption(0)
 { _set_head(i, f, 0); }

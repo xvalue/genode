@@ -19,6 +19,7 @@
 #include <kernel/configuration.h>
 #include <kernel/double_list.h>
 
+#include <base/log.h>
 namespace Kernel
 {
 	/**
@@ -44,6 +45,7 @@ namespace Kernel
 	/**
 	 * Schedules CPU shares for the execution time of a CPU
 	 */
+    template<unsigned Q, unsigned M>
 	class Cpu_scheduler;
 
 	/**
@@ -86,6 +88,7 @@ class Kernel::Cpu_priority
 
 class Kernel::Cpu_share : public Cpu_claim, public Cpu_fill
 {
+    template<unsigned Q, unsigned M>
 	friend class Cpu_scheduler;
 
 	private:
@@ -122,9 +125,17 @@ class Kernel::Cpu_replenishment : public Double_list_item {
         Cpu_share *_share;
 };
 
+//template<typename T, typename U>
+//class Kernel::Cpu_scheduler { }; [> this should raise an error <] 
+
+template< unsigned Q, unsigned M> // TODO: check min quota
 class Kernel::Cpu_scheduler
 {
 	private:
+        enum {
+            _quota = Q,
+            _min_quota = M,
+        };
 
 		typedef Cpu_share                Share;
 		typedef Cpu_fill                 Fill;
@@ -144,12 +155,15 @@ class Kernel::Cpu_scheduler
 		unsigned       _head_quota;
 		bool           _head_claims;
 		bool           _head_yields;
-		unsigned const _quota;
-		unsigned       _residual;
+		//unsigned const _quota;
 		unsigned const _fill;
 
         unsigned _total_replenish;
         unsigned _current_consumption;
+
+        //Replenishment _replenishments[ _quota / _min_quota];
+        Replenishment _replenishments[1000];
+        Replenishment_list _replenish_cache;
 
 		template <typename F> void _for_each_prio(F f) {
 			for (signed p = Prio::MAX; p > Prio::MIN - 1; p--) { f(p); } }
@@ -169,6 +183,8 @@ class Kernel::Cpu_scheduler
 		bool     _claim_for_head(unsigned q);
 		bool     _fill_for_head();
 		unsigned _trim_consumption(unsigned & q);
+        Replenishment * _new_replenishment();
+        void _reset_replenishment(Replenishment * rep);
 
 		/**
 		 * Fill 's' becomes a claim due to a quota donation
@@ -241,11 +257,23 @@ class Kernel::Cpu_scheduler
 		 * Accessors
 		 */
 
-		Share * head() const { return _head; }
+		Share * head() const { 
+            //Genode::log("head aufgerufen");
+            return _head; }
 		unsigned head_quota() const {
-			return Genode::min(_head_quota, _residual); }
-		unsigned quota() const { return _quota; }
-		unsigned residual() const { return _residual; }
+            unsigned q = _head_quota;
+            Genode::log("###### head quota", q);
+			return _head_quota; };
+		unsigned quota() const { 
+            unsigned q = _quota;
+            Genode::log("@@@@ quota ", q);
+            return _quota; }
+		unsigned residual() const { 
+            Genode::log("ich habe keine lust mehr");
+            return 0; } // TODO: wofuer ist das eigentlich
 };
+
+//TODO: ich hab doch keine ahnung
+template class Kernel::Cpu_scheduler<7816000, 10>;
 
 #endif /* _CORE__INCLUDE__KERNEL__CPU_SCHEDULER_H_ */

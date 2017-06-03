@@ -30,7 +30,7 @@ void * operator new(__SIZE_TYPE__ s, void * p) { return p; }
 struct Data
 {
 	Cpu_share idle;
-	Cpu_scheduler scheduler;
+	Cpu_scheduler<7816000, 10> scheduler;
 	char shares[9][sizeof(Cpu_share)];
 
 	Data() : idle(0, 0), scheduler(&idle, 1000, 100) { }
@@ -147,6 +147,7 @@ void ready_check(unsigned const l, unsigned const s, bool const x)
  */
 void Component::construct(Genode::Env &)
 {
+    Genode::log("####### Time \n\n\n\n");
 	/*
 	 * Step-by-step testing
 	 *
@@ -204,6 +205,7 @@ void Component::construct(Genode::Env &)
 	U(180, 800, 0, 100) /* - */
 	U(190, 900, 0, 100) /* - */
 	U(200,   0, 0, 100) /* - */
+    Genode::log("NACHH IDLE");
 
 	/* second round - one claim, one filler */
 	C(1) U(111, 100, 0, 100) /* 1°230 - */

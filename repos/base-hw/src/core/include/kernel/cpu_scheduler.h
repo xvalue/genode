@@ -133,7 +133,7 @@ class Kernel::Cpu_scheduler
 {
 	private:
         enum {
-            _quota = Q,
+            _q = Q,
             _min_quota = M,
         };
 
@@ -152,18 +152,23 @@ class Kernel::Cpu_scheduler
         Replenishment_list _rts;            /* replenishment timings */
 		Share * const  _idle;
 		Share *        _head;
+        Share *        _last_head;
+        bool           _last_head_claimed;
 		unsigned       _head_quota;
 		bool           _head_claims;
 		bool           _head_yields;
-		//unsigned const _quota;
+        unsigned const _quota;
 		unsigned const _fill;
+        unsigned _residual;
 
         unsigned _total_replenish;
         unsigned _current_consumption;
 
         //Replenishment _replenishments[ _quota / _min_quota];
-        Replenishment _replenishments[1000];
+        Replenishment _replenishments[100000];
         Replenishment_list _replenish_cache;
+
+        unsigned _rep_counter;
 
 		template <typename F> void _for_each_prio(F f) {
 			for (signed p = Prio::MAX; p > Prio::MIN - 1; p--) { f(p); } }
@@ -180,7 +185,7 @@ class Kernel::Cpu_scheduler
 		void     _next_fill();
 		void     _head_claimed(unsigned const r);
 		void     _head_filled(unsigned const r);
-		bool     _claim_for_head(unsigned q);
+		bool     _claim_for_head(unsigned r, unsigned q);
 		bool     _fill_for_head();
 		unsigned _trim_consumption(unsigned & q);
         Replenishment * _new_replenishment();
@@ -200,6 +205,8 @@ class Kernel::Cpu_scheduler
 		 * The quota of claim 's' changes to 'q'
 		 */
 		void _quota_adaption(Share * const s, unsigned const q);
+
+        void _add_replenishment(Share * const s);
 
 	public:
 
@@ -258,19 +265,12 @@ class Kernel::Cpu_scheduler
 		 */
 
 		Share * head() const { 
-            //Genode::log("head aufgerufen");
             return _head; }
 		unsigned head_quota() const {
-            unsigned q = _head_quota;
-            Genode::log("###### head quota", q);
 			return _head_quota; };
 		unsigned quota() const { 
-            unsigned q = _quota;
-            Genode::log("@@@@ quota ", q);
             return _quota; }
-		unsigned residual() const { 
-            Genode::log("ich habe keine lust mehr");
-            return 0; } // TODO: wofuer ist das eigentlich
+		unsigned residual() const { return _residual; } // TODO: wofuer ist das eigentlich
 };
 
 //TODO: ich hab doch keine ahnung

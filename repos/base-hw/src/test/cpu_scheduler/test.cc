@@ -101,19 +101,20 @@ void update_check(unsigned const l, unsigned const c, unsigned const t,
 	data()->scheduler.update(c);
 	unsigned const st = time();
 	if (t != st) {
-		Genode::log("wrong time ", st, " in line ", l);
-		done();
+		Genode::log("wrong time ", st, " in line ", l, " expected ", t);
+		//done();
 	}
 	Cpu_share * const hs = data()->scheduler.head();
 	unsigned const hq = data()->scheduler.head_quota();
 	if (hs != share(s)) {
 		unsigned const hi = share_id(hs);
-		Genode::log("wrong share ", hi, " in line ", l);
-		done();
+        unsigned const he = share_id(hs);
+		Genode::log("wrong share ", hi, " in line ", l, " expected ", he);
+		//done();
 	}
 	if (hq != q) {
-		Genode::log("wrong quota ", hq, " in line ", l);
-		done();
+		Genode::log("wrong quota ", hq, " in line ", l, " expected ", q);
+		//done();
 	}
 }
 
@@ -147,7 +148,6 @@ void ready_check(unsigned const l, unsigned const s, bool const x)
  */
 void Component::construct(Genode::Env &)
 {
-    Genode::log("####### Time \n\n\n\n");
 	/*
 	 * Step-by-step testing
 	 *
@@ -205,8 +205,34 @@ void Component::construct(Genode::Env &)
 	U(180, 800, 0, 100) /* - */
 	U(190, 900, 0, 100) /* - */
 	U(200,   0, 0, 100) /* - */
-    Genode::log("NACHH IDLE");
 
+    /* claim refeshes after quota time */
+    C(8) A(8) U(40, 50, 8, 100) // 40
+    U(40, 90, 8, 80) // 40
+    U(10, 100, 8, 40) // 10
+    U(10, 110, 8, 30) // 10
+    U(10, 120, 8, 20) // 10
+    U(10, 130, 8, 10) // 10
+    U(10, 140, 8, 10) // 4 geht in fill
+    U(10, 140, 8, 100) // 4 geht in fill
+    I(8) U(10, 110, 0, 100)
+    U(100, 210, 0, 100)
+    U(100, 310, 0, 100)
+    U(100, 410, 0, 100)
+    U(100, 510, 0, 100)
+    U(100, 610, 0, 100)
+    U(100, 710, 0, 100)
+    U(100, 810, 0, 100)
+    U(100, 910, 0, 100)
+    U(100, 0, 0, 100)
+    U(100, 100, 0, 100)
+    U(100, 200, 0, 100)
+    U(100, 200, 0, 100)
+    U(100, 200, 0, 100)
+    U(100, 200, 0, 100)
+    U(100, 200, 0, 100)
+    A(4) U(100, 600, 4, 100)
+    done();
 	/* second round - one claim, one filler */
 	C(1) U(111, 100, 0, 100) /* 1°230 - */
 	A(1) U(123, 200, 1, 230) /* 1'230 - 1'100 */
@@ -220,7 +246,7 @@ void Component::construct(Genode::Env &)
 	     U( 50, 800, 1,  50) /* 1'0 - 1'50 */
 	     U( 20, 820, 1,  30) /* 1'0 - 1'30 */
 	     U(100, 850, 1, 100) /* 1'0 - 1'100 */
-	     U(200, 950, 1,  50) /* 1'0 - 1'100 */
+	     U(200, 950, 1,  100) /* 1'0 - 1'100 */
 	     U(200,   0, 1, 230) /* 1'230 - 1'100 */
 
 	/* third round - one claim per priority */

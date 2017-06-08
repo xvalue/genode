@@ -29,8 +29,8 @@ void Cpu_scheduler<Q, M>::_reset(Claim * const c) {
 template <unsigned Q, unsigned M>
 void Cpu_scheduler<Q, M>::_reset_claims(unsigned const p)
 {
-	//_rcl[p].for_each([&] (Claim * const c) { _reset(c); });
-	//_ucl[p].for_each([&] (Claim * const c) { _reset(c); });
+    _rcl[p].for_each([&] (Claim * const c) { _reset(c); });
+    _ucl[p].for_each([&] (Claim * const c) { _reset(c); });
 }
 
 
@@ -38,7 +38,7 @@ template<unsigned Q, unsigned M>
 void Cpu_scheduler<Q, M>::_next_round()
 {
     _residual = _quota;
-    _for_each_prio([&] (unsigned const p) { _reset_claims(p); });
+    //_for_each_prio([&] (unsigned const p) { _reset_claims(p); });
 }
 
 
@@ -51,11 +51,11 @@ void Cpu_scheduler<Q, M>::_consumed(unsigned const q)
     if (!rep) {return;} /* No replenish timings, no updating  needed */
 
     if (rep->_replenish_time <= q) {
-        Genode::log("#### replenishing quota ", rep->_consumed_quota);
         Share * s = rep->_share;
         if (!s->_claim) {
             _rcl[s->_prio].insert_tail(s);
         }
+        //Genode::log("Replenish q = ", rep->_consumed_quota);
         s->_claim += rep->_consumed_quota;
         rep->_share = nullptr;
         _rts.remove(rep);
@@ -88,11 +88,12 @@ void Cpu_scheduler<Q, M>::_next_fill()
 
 
 template<unsigned Q, unsigned M>
-void Cpu_scheduler<Q, M>::_head_claimed(unsigned const r)
+void Cpu_scheduler<Q, M>::_head_claimed(unsigned const r, unsigned q)
 {
 	if (!_head->_quota) { return; }
 	_head->_claim = r > _head->_quota ? _head->_quota : r;
-    _current_consumption += r;
+    //Genode::log("consumed q = ", q, " Residual quota r = ", r);
+    _add_replenishment(_head, q);
 	if (_head->_claim || !_head->_ready) { return; }
 	_rcl[_head->_prio].to_tail(_head);
 }
@@ -107,54 +108,25 @@ void Cpu_scheduler<Q, M>::_head_filled(unsigned const r)
 }
 
 
-template<unsigned Q, unsigned M>
-bool Cpu_scheduler<Q, M>::_claim_for_head(unsigned r, unsigned q)
+    template<unsigned Q, unsigned M>
+bool Cpu_scheduler<Q, M>::_claim_for_head(unsigned r)
 {
-	for (signed p = Prio::MAX; p > Prio::MIN - 1; p--) {
+    for (signed p = Prio::MAX; p > Prio::MIN - 1; p--) {
         Share * const s = _share(_rcl[p].head());
         if (!s) { continue; }
         if (!s->_claim) { continue; }
-
-        Genode::log("Quota q ", q);
-        if (_last_head == s) {
-            _set_head(s, s->_claim, 1);
-            return 1;
-        }
-        if (_last_head != s) { // neuer job claim -> claim
-            Genode::log("new replenishment ", _current_consumption , 
-                    " quota = ", q, " last_heas = ", _last_head);
-            if (_last_head_claimed && !_last_head)
-                _add_replenishment(_last_head);
-            _last_head_claimed   = true;
-            _last_head           = s;
-
-            _current_consumption = 0;
-        } 
-
         _set_head(s, s->_claim, 1);
         return 1;
-        
-	}
-
-    if (_last_head_claimed) { // alter job claim -> X
-        _last_head_claimed = false;
-        _add_replenishment(_last_head);
-        //_last_head         = nullptr;
-
-        _current_consumption = 0;
     }
-    _last_head_claimed = false;
-	return 0;
+    return 0;
 }
-template<unsigned Q, unsigned M>
-void Cpu_scheduler<Q, M>::_add_replenishment(Share * const s) {
-    Replenishment *rep = _new_replenishment();
-    if (!rep || s == nullptr) {
-        Genode::log("replenish ist leer rep = ", rep); //TODO: exception werfen
-        return;
-    }
 
-    rep->_consumed_quota = _current_consumption;
+template<unsigned Q, unsigned M>
+void Cpu_scheduler<Q, M>::_add_replenishment(Share * const s, unsigned const q) {
+    Replenishment *rep = _new_replenishment();
+    assert(rep != nullptr);
+
+    rep->_consumed_quota = q;
     rep->_share          = s;
 
     Replenishment *rhead = _rts.head();
@@ -221,13 +193,13 @@ void Cpu_scheduler<Q, M>::update(unsigned q)
 	/* do not detract the quota if the head context was removed even now */
     unsigned const r = _trim_consumption(q);
 	if (_head) {
-		if (_head_claims) { _head_claimed(r); }
+		if (_head_claims) { _head_claimed(r, q); }
 		else              { _head_filled(r);  }
 		_consumed(q);
 	}
 
 
-	if (_claim_for_head(r, q)) { return; }
+	if (_claim_for_head(r)) { return; }
 	if (_fill_for_head()) { return; }
 
 
@@ -288,15 +260,13 @@ void Cpu_scheduler<Q, M>::remove(Share * const s)
 
 	if (s == _head) _head = nullptr;
 	if (s->_ready) { _fills.remove(s); }
-	if (!s->_quota) { return; } // TODO: check if replenishment
+	if (!s->_quota) { return; }
 	if (s->_ready) { _rcl[s->_prio].remove(s); }
 	else { _ucl[s->_prio].remove(s); }
 
     Replenishment *rep = _rts.head();
     if (!rep) { return; }
     
-    
-    Genode::log("loesche job");
     while (rep) {
         if (rep->_share == s) {
             Replenishment *tmp = Replenishment_list::next(rep);
@@ -349,12 +319,24 @@ void Cpu_scheduler<Q, M>::quota(Share * const s, unsigned const q)
 	s->_quota = q;
 }
 
+template<unsigned Q, unsigned M>
+void Cpu_scheduler<Q, M>::reset_claims() 
+{
+    Replenishment * rep = _rts.head();
+    while(!rep) {
+        Genode::log("alter");
+        Replenishment * tmp = Replenishment_list::next(rep);
+        _rts.remove(rep);
+        rep = tmp;
+    }
+    _for_each_prio([&] (unsigned const p) { _reset_claims(p); });
+}
+
 
 template<unsigned Q, unsigned M>
 Cpu_scheduler<Q, M>::Cpu_scheduler(Share * const i, unsigned const q, unsigned const f)
-: _idle(i), _head_yields(0), _fill(f), _quota(q),  
-    _residual(q), _total_replenish(0), _current_consumption(0), _rep_counter(0), 
-    _last_head_claimed(false), _last_head(nullptr)
+: _idle(i), _head_yields(0), _quota(q), _fill(f),
+    _residual(q), _total_replenish(0), _rep_counter(0)
 { 
     _set_head(i, f, 0); 
     

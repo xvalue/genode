@@ -152,8 +152,6 @@ class Kernel::Cpu_scheduler
         Replenishment_list _rts;            /* replenishment timings */
 		Share * const  _idle;
 		Share *        _head;
-        Share *        _last_head;
-        bool           _last_head_claimed;
 		unsigned       _head_quota;
 		bool           _head_claims;
 		bool           _head_yields;
@@ -162,7 +160,6 @@ class Kernel::Cpu_scheduler
         unsigned _residual;
 
         unsigned _total_replenish;
-        unsigned _current_consumption;
 
         //Replenishment _replenishments[ _quota / _min_quota];
         Replenishment _replenishments[100000];
@@ -183,9 +180,9 @@ class Kernel::Cpu_scheduler
 		void     _consumed(unsigned const q);
 		void     _set_head(Share * const s, unsigned const q, bool const c);
 		void     _next_fill();
-		void     _head_claimed(unsigned const r);
+		void     _head_claimed(unsigned const r, unsigned q);
 		void     _head_filled(unsigned const r);
-		bool     _claim_for_head(unsigned r, unsigned q);
+		bool     _claim_for_head(unsigned r);
 		bool     _fill_for_head();
 		unsigned _trim_consumption(unsigned & q);
         Replenishment * _new_replenishment();
@@ -206,7 +203,7 @@ class Kernel::Cpu_scheduler
 		 */
 		void _quota_adaption(Share * const s, unsigned const q);
 
-        void _add_replenishment(Share * const s);
+        void _add_replenishment(Share * const s, unsigned const q);
 
 	public:
 
@@ -271,6 +268,8 @@ class Kernel::Cpu_scheduler
 		unsigned quota() const { 
             return _quota; }
 		unsigned residual() const { return _residual; } // TODO: wofuer ist das eigentlich
+
+        void reset_claims();
 };
 
 //TODO: ich hab doch keine ahnung
